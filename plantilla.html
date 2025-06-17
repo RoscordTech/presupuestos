@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Presupuesto {{ numero }}</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; font-size: 14px; }
+        .invoice-box { max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); }
+        .header { width: 100%; display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .company-details { text-align: left; }
+        .client-details { text-align: right; }
+        .company-details h2 { margin: 0 0 10px 0; font-size: 24px; color: #0056b3; }
+        .invoice-details { text-align: right; margin-bottom: 40px; }
+        .invoice-details h1 { margin: 0; font-size: 36px; color: #444; }
+        .invoice-details p { margin: 2px 0; }
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        .items-table th, .items-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        .items-table th { background-color: #f2f2f2; font-weight: bold; }
+        .totals-section { display: flex; justify-content: flex-end; }
+        .totals-table { width: 45%; border-collapse: collapse; }
+        .totals-table td { padding: 8px; }
+        .label { text-align: right; font-weight: bold; }
+        .total { font-weight: bold; font-size: 1.2em; border-top: 2px solid #333; }
+        .notes { margin-top: 40px; padding: 15px; background-color: #f9f9f9; border-left: 4px solid #0056b3; }
+        .footer { margin-top: 50px; text-align: center; font-size: 0.9em; color: #777; }
+        .text-right { text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="invoice-box">
+        {% if logo_path %}
+        <div style="margin-bottom: 20px; text-align: center;">
+            <img src="{{ logo_path }}" alt="Logo" style="max-height: 100px;">
+        </div>
+        {% endif %}
+
+        <div class="header">
+            <div class="company-details">
+                <h2>{{ empresa.nombre }}</h2>
+                <p>
+                    {{ empresa.direccion | replace('\n', '<br>') | safe }}<br>
+                    NIF: {{ empresa.nif }}<br>
+                    {{ empresa.telefono }} | {{ empresa.email }}
+                </p>
+            </div>
+            <div class="client-details">
+                <h4>DATOS DEL CLIENTE</h4>
+                <p>
+                    <strong>{{ cliente.nombre }}</strong><br>
+                    {{ cliente.direccion | replace('\n', '<br>') | safe }}<br>
+                    DNI: {{ cliente.dni }}
+                </p>
+            </div>
+        </div>
+
+        <div class="invoice-details">
+            <h1>PRESUPUESTO</h1>
+            <p><strong>Nº Presupuesto:</strong> {{ numero }}</p>
+            <p><strong>Fecha:</strong> {{ fecha }}</p>
+        </div>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Concepto / Descripción</th>
+                    <th class="text-right">Cantidad</th>
+                    <th class="text-right">Precio Unitario</th>
+                    <th class="text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.descripcion }}</td>
+                    <td class="text-right">{{ item.cantidad }}</td>
+                    <td class="text-right">{{ "%.2f"|format(item.precio_unitario) }} €</td>
+                    <td class="text-right">{{ "%.2f"|format(item.cantidad * item.precio_unitario) }} €</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="totals-section">
+            <table class="totals-table">
+                <tbody>
+                    <tr>
+                        <td class="label">Base Imponible</td>
+                        <td class="text-right">{{ "%.2f"|format(base_imponible) }} €</td>
+                    </tr>
+                    <tr>
+                        <td class="label">IVA (21%)</td>
+                        <td class="text-right">{{ "%.2f"|format(iva) }} €</td>
+                    </tr>
+                    <tr>
+                        <td class="label total">TOTAL</td>
+                        <td class="text-right total">{{ "%.2f"|format(total) }} €</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="notes">
+            <h4>Notas y Condiciones</h4>
+            <div style="white-space: pre-wrap; font-size: 0.9em;">{{ notas }}</div>
+        </div>
+        
+        <div class="footer">
+            <p>Gracias por su confianza.</p>
+        </div>
+    </div>
+</body>
+</html>
+
