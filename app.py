@@ -4,6 +4,16 @@ import json # Para manejar datos en formato JSON
 from datetime import datetime # Para obtener la fecha actual
 from fpdf import FPDF # <-- Nueva librería para generar PDFs
 
+# --- Inicialización de variables de estado para la descarga ---
+# Estas variables se reinician en cada re-ejecución completa del script,
+# asegurando que los botones de descarga no intenten renderizarse con datos antiguos o nulos.
+if 'pdf_download_data' not in st.session_state:
+    st.session_state.pdf_download_data = None
+if 'json_download_data' not in st.session_state:
+    st.session_state.json_download_data = None
+if 'download_filename' not in st.session_state:
+    st.session_state.download_filename = "" # Para almacenar el nombre base del archivo
+
 # --- Función para inicializar el estado de la sesión de Streamlit ---
 def initialize_session_state():
     if 'empresa' not in st.session_state:
@@ -40,32 +50,19 @@ def generate_pdf_bytes(data):
         pdf.add_page()
         
         # --- Cargar todas las variantes (normal, negrita) de la fuente Unicode ---
-        # ¡IMPORTANTE! Asegúrate de que estos nombres de archivo .ttf coincidan EXACTAMENTE
-        # con los archivos que tienes en la misma carpeta que 'app.py'.
-        font_name = "DejaVuSans" # Este es el nombre que usaremos para referenciar la fuente en set_font()
+        font_name = "DejaVuSans" 
         font_path_normal = "DejaVuSansCondensed.ttf"
         font_path_bold = "DejaVuSansCondensed-Bold.ttf"
-        # font_path_italic = "DejaVuSansCondensed-Oblique.ttf" # <--- YA NO SE NECESITA NI SE CARGA
 
         try:
-            # Carga la versión normal de la fuente
             pdf.add_font(font_name, "", font_path_normal, uni=True)
-            # Carga la versión negrita de la fuente (estilo "B")
             pdf.add_font(font_name, "B", font_path_bold, uni=True) 
-            # YA NO SE CARGA LA VERSIÓN CURSIVA (ESTILO "I")
-            # Nota: FPDF puede combinar "B" e "I" para "BI" si no se proporciona un archivo específico,
-            # pero no usaremos "I" en ninguna parte ahora.
 
         except Exception as e:
-            # Si hay un error al cargar alguna de las fuentes personalizadas,
-            # usará la fuente predefinida "helvetica" como alternativa.
             st.error(f"Error al cargar una o más variantes de la fuente {font_name}. Asegúrate de que los archivos TTF estén en la carpeta raíz y los nombres de archivo sean correctos. Usando Helvetica como fallback. Error: {e}")
             pdf.set_font("helvetica", size=10) # Fallback
             st.warning("Se ha usado Helvetica. Puede que algunos caracteres (como '€') no se muestren correctamente.")
-            # Si el fallback a Helvetica ocurre, el resto de las llamadas a set_font() deben usar "helvetica"
-
-        # --- AHORA USAREMOS ESTA FUENTE (DejaVuSans) EN TODAS PARTES ---
-        # Asegúrate de usar el 'font_name' que definimos ("DejaVuSans").
+            
         pdf.set_font(font_name, size=10) 
 
         # Configuración de márgenes y posiciones
@@ -88,10 +85,10 @@ def generate_pdf_bytes(data):
             current_y += 10 
 
         # --- Datos de la Empresa ---
-        pdf.set_font(font_name, "B", 12) # Usando DejaVuSans en negrita
+        pdf.set_font(font_name, "B", 12) 
         pdf.set_xy(col1_x, current_y)
         pdf.multi_cell(0, 5, data["empresa"]["nombre"]) 
-        pdf.set_font(font_name, "", 10) # Usando DejaVuSans normal
+        pdf.set_font(font_name, "", 10) 
         current_y = pdf.get_y() 
         pdf.set_xy(col1_x, current_y)
         pdf.multi_cell(0, 5, data["empresa"]["direccion"])
@@ -139,7 +136,7 @@ def generate_pdf_bytes(data):
 
         # Dibujar encabezados de la tabla
         pdf.set_fill_color(224, 224, 224) 
-        pdf.set_font(font_name, "B", 10) # Usando DejaVuSans en negrita para encabezados
+        pdf.set_font(font_name, "B", 10) 
         x_pos = margin
         for i, header in enumerate(table_headers):
             pdf.set_xy(x_pos, current_y + 10)
@@ -149,7 +146,7 @@ def generate_pdf_bytes(data):
         current_y = pdf.get_y() 
 
         # Dibujar filas de conceptos
-        pdf.set_font(font_name, "", 10) # Usando DejaVuSans normal para filas
+        pdf.set_font(font_name, "", 10) 
         for i, item in enumerate(data["conceptos"]):
             pdf.set_fill_color(255, 255, 255) if i % 2 == 0 else pdf.set_fill_color(245, 245, 245)
             x_pos = margin
@@ -194,12 +191,10 @@ def generate_pdf_bytes(data):
         pdf.multi_cell(pdf.w - 2 * margin, 4, data['notas']) 
 
         # --- Pie de página ---
-        pdf.set_font(font_name, "", 8) # Usando DejaVuSans normal, tamaño 8
+        pdf.set_font(font_name, "", 8) 
         pdf.set_xy(margin, pdf.h - 15) 
         pdf.cell(0, 10, "Gracias por su confianza.", 0, 0, 'C')
 
-        # Devolver el PDF como bytes
-        # CORRECCIÓN: Eliminar .encode('latin-1') ya que pdf.output devuelve bytes/bytearray
         return pdf.output(dest='S') 
 
     except Exception as e:
@@ -315,6 +310,11 @@ st.markdown("---")
 
 # --- Botón de Generar PDF y JSON ---
 if st.button("GENERAR PRESUPUESTO"):
+    # Limpiamos los datos de descarga anteriores del estado de la sesión
+    st.session_state.pdf_download_data = None
+    st.session_state.json_download_data = None
+    st.session_state.download_filename = "" # También el nombre del archivo
+
     budget_data = {
         "empresa": st.session_state.empresa,
         "cliente": st.session_state.cliente,
@@ -328,26 +328,35 @@ if st.button("GENERAR PRESUPUESTO"):
     numero_limpio = "".join(c for c in budget_data["detalles"]["numero"] if c.isalnum() or c in ('-', '_')).rstrip()
     cliente_limpio = "".join(c for c in budget_data["cliente"]["nombre"] if c.isalnum() or c in ('-', '_')).rstrip()
     filename_base = f"Presupuesto_{numero_limpio}_{cliente_limpio}"
+    st.session_state.download_filename = filename_base # Guardamos el nombre base en el estado
 
     pdf_output = generate_pdf_bytes(budget_data)
     if pdf_output:
-        st.download_button(
-            label="Descargar PDF",
-            data=pdf_output,
-            file_name=f"{filename_base}.pdf",
-            mime="application/pdf",
-            key="download_pdf_button"
-        )
-        st.success("PDF generado. Haz clic en el botón 'Descargar PDF' de arriba.")
+        st.session_state.pdf_download_data = pdf_output # Almacenamos los bytes del PDF en el estado
+        st.success("PDF generado. Haz clic en el botón 'Descargar PDF' de abajo.")
     else:
         st.error("No se pudo generar el PDF. Revisa los mensajes de error.")
 
-
     json_output = json.dumps(budget_data, ensure_ascii=False, indent=4).encode('utf-8')
+    st.session_state.json_download_data = json_output # Almacenamos los bytes del JSON en el estado
+
+
+# --- Mostrar botones de descarga solo si hay datos disponibles en el estado ---
+# Estos botones se renderizarán en la siguiente ejecución del script si se generaron datos con éxito
+if st.session_state.pdf_download_data is not None and st.session_state.download_filename != "":
+    st.download_button(
+        label="Descargar PDF",
+        data=st.session_state.pdf_download_data,
+        file_name=f"{st.session_state.download_filename}.pdf",
+        mime="application/pdf",
+        key="download_pdf_button"
+    )
+
+if st.session_state.json_download_data is not None and st.session_state.download_filename != "":
     st.download_button(
         label="Descargar Plantilla JSON",
-        data=json_output,
-        file_name=f"Plantilla_{filename_base}.json",
+        data=st.session_state.json_download_data,
+        file_name=f"Plantilla_{st.session_state.download_filename}.json",
         mime="application/json",
         key="download_json_button"
     )
