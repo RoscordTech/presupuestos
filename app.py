@@ -194,13 +194,13 @@ def generate_pdf_bytes(data):
         pdf.multi_cell(pdf.w - 2 * margin, 4, data['notas']) 
 
         # --- Pie de página ---
-        # CORRECCIÓN: Usando la fuente normal ("") en lugar de cursiva ("I")
         pdf.set_font(font_name, "", 8) # Usando DejaVuSans normal, tamaño 8
         pdf.set_xy(margin, pdf.h - 15) 
         pdf.cell(0, 10, "Gracias por su confianza.", 0, 0, 'C')
 
         # Devolver el PDF como bytes
-        return pdf.output(dest='S').encode('latin-1') 
+        # CORRECCIÓN: Eliminar .encode('latin-1') ya que pdf.output devuelve bytes/bytearray
+        return pdf.output(dest='S') 
 
     except Exception as e:
         st.error(f"Ocurrió un error al generar el PDF: {e}")
