@@ -5,34 +5,34 @@ from datetime import datetime # Para obtener la fecha actual
 from fpdf import FPDF # <-- Nueva librería para generar PDFs
 
 # --- Inicialización de variables de estado de la sesión ---
-# Mantendremos estas inicializaciones para la gestión general del formulario,
-# pero los datos de descarga directos no se mantendrán entre ejecuciones principales.
-if 'empresa' not in st.session_state:
-    st.session_state.empresa = {
-        "nombre": "SERVICIO TECNICO ERB",
-        "nif": "60379728J",
-        "direccion": "CL RAMBLA BRASIL, 7 D EN 4\n08028 - BARCELONA", 
-        "telefono": "",
-        "email": "",
-        "logo_file": "logo.png" # <--- ¡IMPORTANTE! Asegúrate que este sea el nombre EXACTO de tu archivo de logo (ej. logo.jpg)
-    }
-if 'cliente' not in st.session_state:
-    st.session_state.cliente = {
-        "nombre": "",
-        "dni": "",
-        "direccion": ""
-    }
-if 'detalles' not in st.session_state:
-    st.session_state.detalles = {
-        "numero": "",
-        "fecha": datetime.now().strftime("%d/%m/%Y")
-    }
-if 'conceptos' not in st.session_state:
-    st.session_state.conceptos = [{"descripcion": "", "cantidad": "", "precio": ""}]
-if 'notas' not in st.session_state:
-    st.session_state.notas = ""
-if 'aplicar_iva' not in st.session_state:
-    st.session_state.aplicar_iva = True
+# Estas variables se inicializan solo si no existen, para mantener el estado del formulario.
+def initialize_session_state():
+    if 'empresa' not in st.session_state:
+        st.session_state.empresa = {
+            "nombre": "SERVICIO TECNICO ERB",
+            "nif": "60379728J",
+            "direccion": "CL RAMBLA BRASIL, 7 D EN 4\n08028 - BARCELONA", 
+            "telefono": "",
+            "email": "",
+            "logo_file": "logo.png" # <--- ¡IMPORTANTE! Asegúrate que este sea el nombre EXACTO de tu archivo de logo (ej. logo.jpg)
+        }
+    if 'cliente' not in st.session_state:
+        st.session_state.cliente = {
+            "nombre": "",
+            "dni": "",
+            "direccion": ""
+        }
+    if 'detalles' not in st.session_state:
+        st.session_state.detalles = {
+            "numero": "",
+            "fecha": datetime.now().strftime("%d/%m/%Y")
+        }
+    if 'conceptos' not in st.session_state:
+        st.session_state.conceptos = [{"descripcion": "", "cantidad": "", "precio": ""}]
+    if 'notas' not in st.session_state:
+        st.session_state.notas = ""
+    if 'aplicar_iva' not in st.session_state:
+        st.session_state.aplicar_iva = True
 
 # --- Función para generar el PDF con fpdf2 ---
 def generate_pdf_bytes(data):
@@ -215,12 +215,13 @@ if uploaded_file is not None:
         st.session_state.empresa = data.get("empresa", st.session_state.empresa)
         st.session_state.cliente = data.get("cliente", st.session_state.cliente)
         st.session_state.detalles = data.get("detalles", st.session_state.detalles)
-        # Asegurarse de que los conceptos se carguen correctamente y sean mutables si es necesario
-        # También que si hay concepto es lista y no otro tipo de datos
+        
+        # Asegurarse de que los conceptos se carguen correctamente y sean una lista
         if isinstance(data.get("conceptos"), list):
             st.session_state.conceptos = data.get("conceptos")
         else:
             st.session_state.conceptos = [{"descripcion": "", "cantidad": "", "precio": ""}] # Resetea si el formato no es lista
+
         st.session_state.notas = data.get("notas", "")
         st.session_state.aplicar_iva = data.get("aplicar_iva", True)
         st.sidebar.success("Plantilla cargada con éxito!")
