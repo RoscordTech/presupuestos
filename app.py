@@ -238,89 +238,93 @@ if uploaded_file is not None:
     except Exception as e:
         st.sidebar.error(f"Error al cargar la plantilla: {e}")
 
-# --- Formulario Principal ---
-
-# Sección: Datos de tu Empresa
-st.subheader("Datos de tu Empresa") 
-st.session_state.empresa["nombre"] = st.text_input("Nombre:", value=st.session_state.empresa["nombre"], key="empresa_nombre")
-st.session_state.empresa["nif"] = st.text_input("NIF/CIF:", value=st.session_state.empresa["nif"], key="empresa_nif")
-st.session_state.empresa["direccion"] = st.text_area("Dirección:", value=st.session_state.empresa["direccion"], key="empresa_direccion")
-st.session_state.empresa["telefono"] = st.text_input("Teléfono:", value=st.session_state.empresa["telefono"], key="empresa_telefono")
-st.session_state.empresa["email"] = st.text_input("Email:", value=st.session_state.empresa["email"], key="empresa_email")
-st.session_state.empresa["logo_file"] = st.text_input("Nombre del archivo del Logo (ej. logo.png):", value=st.session_state.empresa["logo_file"], key="empresa_logo_file")
-
-
-# Sección: Datos del Cliente
-st.subheader("Datos del Cliente")
-st.session_state.cliente["nombre"] = st.text_input("Nombre del Cliente:", value=st.session_state.cliente["nombre"], key="cliente_nombre")
-st.session_state.cliente["dni"] = st.text_input("DNI/NIF del Cliente:", value=st.session_state.cliente["dni"], key="cliente_dni")
-st.session_state.cliente["direccion"] = st.text_area("Dirección del Cliente:", value=st.session_state.cliente["direccion"], key="cliente_direccion")
-
-# Sección: Detalles del Presupuesto
-st.subheader("Detalles del Presupuesto")
-st.session_state.detalles["numero"] = st.text_input("Número de Presupuesto:", value=st.session_state.detalles["numero"], key="presupuesto_numero")
-st.session_state.detalles["fecha"] = st.text_input("Fecha (DD/MM/AAAA):", value=st.session_state.detalles["fecha"], key="presupuesto_fecha")
-
-# Sección: Conceptos
-st.subheader("Conceptos")
-col1, col2, col3, col4 = st.columns([0.6, 0.15, 0.15, 0.1])
-with col1: st.write("**Descripción**")
-with col2: st.write("**Cant.**")
-with col3: st.write("**Precio (€)**")
-with col4: st.write("") # Columna para el botón de borrar
-
-new_conceptos = []
-deleted_indices = set() 
-
-for i, concepto in enumerate(st.session_state.conceptos):
-    if i in deleted_indices: # Si el concepto ya está marcado para eliminación, lo saltamos
-        continue 
-
-    cols = st.columns([0.6, 0.15, 0.15, 0.1])
-    with cols[0]:
-        desc = st.text_input(f"Descripción_{i}", value=concepto["descripcion"], label_visibility="collapsed", key=f"desc_{i}")
-    with cols[1]:
-        cant_str = st.text_input(f"Cantidad_{i}", value=str(concepto["cantidad"]), label_visibility="collapsed", key=f"cant_{i}")
-        cant = float(cant_str) if cant_str.replace('.', '', 1).isdigit() else 0.0
-    with cols[2]:
-        precio_str = st.text_input(f"Precio_{i}", value=str(concepto["precio"]), label_visibility="collapsed", key=f"precio_{i}")
-        precio = float(precio_str) if precio_str.replace('.', '', 1).isdigit() else 0.0
-    with cols[3]:
-        if st.button("X", key=f"delete_btn_{i}"):
-            deleted_indices.add(i) 
-
-    new_conceptos.append({"descripcion": desc, "cantidad": cant, "precio": precio})
-
-# Reconstruir la lista de conceptos después de procesar todas las filas
-st.session_state.conceptos = [c for i, c in enumerate(new_conceptos) if i not in deleted_indices]
-
-if deleted_indices:
-    st.experimental_rerun()
+# --- Inicio del Formulario Principal de Streamlit ---
+# Todos los campos de entrada y el botón de envío principal van dentro de este 'with'
+with st.form(key="budget_form"):
+    # Sección: Datos de tu Empresa
+    st.subheader("Datos de tu Empresa") 
+    st.session_state.empresa["nombre"] = st.text_input("Nombre:", value=st.session_state.empresa["nombre"], key="empresa_nombre")
+    st.session_state.empresa["nif"] = st.text_input("NIF/CIF:", value=st.session_state.empresa["nif"], key="empresa_nif")
+    st.session_state.empresa["direccion"] = st.text_area("Dirección:", value=st.session_state.empresa["direccion"], key="empresa_direccion")
+    st.session_state.empresa["telefono"] = st.text_input("Teléfono:", value=st.session_state.empresa["telefono"], key="empresa_telefono")
+    st.session_state.empresa["email"] = st.text_input("Email:", value=st.session_state.empresa["email"], key="empresa_email")
+    st.session_state.empresa["logo_file"] = st.text_input("Nombre del archivo del Logo (ej. logo.png):", value=st.session_state.empresa["logo_file"], key="empresa_logo_file")
 
 
-if st.button("Añadir Concepto"):
-    st.session_state.conceptos.append({"descripcion": "", "cantidad": "", "precio": ""})
-    st.experimental_rerun() 
+    # Sección: Datos del Cliente
+    st.subheader("Datos del Cliente")
+    st.session_state.cliente["nombre"] = st.text_input("Nombre del Cliente:", value=st.session_state.cliente["nombre"], key="cliente_nombre")
+    st.session_state.cliente["dni"] = st.text_input("DNI/NIF del Cliente:", value=st.session_state.cliente["dni"], key="cliente_dni")
+    st.session_state.cliente["direccion"] = st.text_area("Dirección del Cliente:", value=st.session_state.cliente["direccion"], key="cliente_direccion")
 
-# Sección: Opciones y Finalización
-st.subheader("Opciones y Finalización")
-st.session_state.aplicar_iva = st.checkbox("Calcular IVA (21%)", value=st.session_state.aplicar_iva)
-st.session_state.notas = st.text_area("Notas y Condiciones:", value=st.session_state.notas)
+    # Sección: Detalles del Presupuesto
+    st.subheader("Detalles del Presupuesto")
+    st.session_state.detalles["numero"] = st.text_input("Número de Presupuesto:", value=st.session_state.detalles["numero"], key="presupuesto_numero")
+    st.session_state.detalles["fecha"] = st.text_input("Fecha (DD/MM/AAAA):", value=st.session_state.detalles["fecha"], key="presupuesto_fecha")
 
-# --- Calcular Totales y Mostrar ---
-subtotal = sum(c["cantidad"] * c["precio"] for c in st.session_state.conceptos if isinstance(c["cantidad"], (int, float)) and isinstance(c["precio"], (int, float)))
-iva = subtotal * 0.21 if st.session_state.aplicar_iva else 0
-total = subtotal + iva
+    # Sección: Conceptos
+    st.subheader("Conceptos")
+    col1, col2, col3, col4 = st.columns([0.6, 0.15, 0.15, 0.1])
+    with col1: st.write("**Descripción**")
+    with col2: st.write("**Cant.**")
+    with col3: st.write("**Precio (€)**")
+    with col4: st.write("") # Columna para el botón de borrar
 
-st.markdown("---") 
-st.subheader("Resumen de Totales:")
-st.write(f"**Base Imponible:** {subtotal:.2f} €")
-st.write(f"**IVA (21%):** {iva:.2f} €")
-st.write(f"**TOTAL:** {total:.2f} €")
-st.markdown("---")
+    new_conceptos = []
+    deleted_indices = set() 
 
-# --- Botón de Generar PDF y JSON (Los botones de descarga se crean aquí directamente) ---
-if st.button("GENERAR PRESUPUESTO"):
+    for i, concepto in enumerate(st.session_state.conceptos):
+        # AQUI NO USAMOS if i in deleted_indices: continue, porque el rerun lo manejará mejor
+        cols = st.columns([0.6, 0.15, 0.15, 0.1])
+        with cols[0]:
+            desc = st.text_input(f"Descripción_{i}", value=concepto["descripcion"], label_visibility="collapsed", key=f"desc_{i}")
+        with cols[1]:
+            cant_str = st.text_input(f"Cantidad_{i}", value=str(concepto["cantidad"]), label_visibility="collapsed", key=f"cant_{i}")
+            cant = float(cant_str) if cant_str.replace('.', '', 1).isdigit() else 0.0
+        with cols[2]:
+            precio_str = st.text_input(f"Precio_{i}", value=str(concepto["precio"]), label_visibility="collapsed", key=f"precio_{i}")
+            precio = float(precio_str) if precio_str.replace('.', '', 1).isdigit() else 0.0
+        with cols[3]:
+            # st.button puede usarse dentro de st.form si no es el botón de submit
+            if st.button("X", key=f"delete_btn_{i}"):
+                deleted_indices.add(i) 
+
+        new_conceptos.append({"descripcion": desc, "cantidad": cant, "precio": precio})
+
+    # Reconstruir la lista de conceptos después de procesar todas las filas
+    st.session_state.conceptos = [c for i, c in enumerate(new_conceptos) if i not in deleted_indices]
+
+    if deleted_indices:
+        st.experimental_rerun() # Fuerza un rerun si se borró algo para actualizar la UI
+
+    # st.button puede usarse dentro de st.form si no es el botón de submit
+    if st.button("Añadir Concepto"):
+        st.session_state.conceptos.append({"descripcion": "", "cantidad": "", "precio": ""})
+        st.experimental_rerun() # Fuerza un rerun para añadir la fila
+
+    # Sección: Opciones y Finalización
+    st.subheader("Opciones y Finalización")
+    st.session_state.aplicar_iva = st.checkbox("Calcular IVA (21%)", value=st.session_state.aplicar_iva)
+    st.session_state.notas = st.text_area("Notas y Condiciones:", value=st.session_state.notas)
+
+    # --- Calcular Totales y Mostrar (Dentro del Formulario) ---
+    subtotal = sum(c["cantidad"] * c["precio"] for c in st.session_state.conceptos if isinstance(c["cantidad"], (int, float)) and isinstance(c["precio"], (int, float)))
+    iva = subtotal * 0.21 if st.session_state.aplicar_iva else 0
+    total = subtotal + iva
+
+    st.markdown("---") 
+    st.subheader("Resumen de Totales:")
+    st.write(f"**Base Imponible:** {subtotal:.2f} €")
+    st.write(f"**IVA (21%):** {iva:.2f} €")
+    st.write(f"**TOTAL:** {total:.2f} €")
+    st.markdown("---")
+
+    # --- Botón PRINCIPAL de Envío del Formulario ---
+    # Este es el botón que resuelve el error. Solo los st.form_submit_button() envían el formulario.
+    submitted = st.form_submit_button("GENERAR PRESUPUESTO")
+
+# --- Lógica de generación y descarga (SOLO se ejecuta si el formulario fue enviado) ---
+if submitted:
     # Reseteamos los datos de descarga y la bandera
     st.session_state.pdf_download_data = None
     st.session_state.json_download_data = None
