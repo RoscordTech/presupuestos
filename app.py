@@ -34,13 +34,8 @@ def initialize_session_state():
     if 'aplicar_iva' not in st.session_state:
         st.session_state.aplicar_iva = True
     
-    # Inicialización de variables para las descargas
-    if 'pdf_download_data' not in st.session_state:
-        st.session_state.pdf_download_data = None
-    if 'json_download_data' not in st.session_state:
-        st.session_state.json_download_data = None
-    if 'download_filename_base' not in st.session_state:
-        st.session_state.download_filename_base = ""
+    # Las variables de descarga directa (pdf_download_data, etc.) ya no son necesarias en st.session_state
+    # porque los botones se renderizarán condicionalmente en la misma ejecución que genera los datos.
 
 
 # --- Función para generar el PDF con fpdf2 ---
@@ -318,11 +313,12 @@ st.write(f"**TOTAL:** {total:.2f} €")
 st.markdown("---")
 
 # --- Botón de Generar PDF y JSON (Los botones de descarga se crean aquí directamente) ---
+# Este es el botón principal que activa la generación y la visibilidad de los botones de descarga
 if st.button("GENERAR PRESUPUESTO"):
-    # Limpiamos los datos de descarga anteriores del estado de la sesión
+    # Reseteamos los datos de descarga en el estado para la nueva generación
     st.session_state.pdf_download_data = None
     st.session_state.json_download_data = None
-    st.session_state.download_filename_base = "" # Limpiamos el nombre base del archivo
+    st.session_state.download_filename_base = "" 
 
     budget_data = {
         "empresa": st.session_state.empresa,
@@ -337,31 +333,28 @@ if st.button("GENERAR PRESUPUESTO"):
     numero_limpio = "".join(c for c in budget_data["detalles"]["numero"] if c.isalnum() or c in ('-', '_')).rstrip()
     cliente_limpio = "".join(c for c in budget_data["cliente"]["nombre"] if c.isalnum() or c in ('-', '_')).rstrip()
     filename_base = f"Presupuesto_{numero_limpio}_{cliente_limpio}"
-    st.session_state.download_filename_base = filename_base # Guardamos el nombre base en el estado
+    st.session_state.download_filename_base = filename_base # Guardamos el nombre base del archivo
 
     pdf_output = generate_pdf_bytes(budget_data)
     if pdf_output:
-        st.session_state.pdf_download_data = pdf_output # Almacenamos los bytes del PDF en el estado
-        st.success("PDF generado. Haz clic en el botón 'Descargar PDF' de abajo.")
+        st.session_state.pdf_download_data = pdf_output # Almacenamos los bytes del PDF
+        st.success("PDF generado. Puedes descargarlo abajo.")
     else:
         st.error("No se pudo generar el PDF. Revisa los mensajes de error.")
-        # Si el PDF falla, es posible que el JSON también falle o no se necesite,
-        # así que no generamos el JSON si el PDF no se pudo hacer.
-        # Podrías cambiar esto si quieres que el JSON se genere siempre.
-
-
-    # Generar JSON editable si el PDF se generó, o si quieres que se genere siempre
-    # He movido la generación del JSON y su botón AQUI para que siempre se generen juntos
-    if pdf_output: # O si quieres que el JSON se genere siempre, elimina esta línea 'if pdf_output:'
+    
+    # Generar JSON si el PDF se generó, o siempre si así lo prefieres
+    # Aquí decidimos que el JSON también se genere solo si el PDF se generó con éxito
+    if pdf_output: # Solo genera JSON si el PDF se hizo (podrías cambiar esta condición)
         json_output = json.dumps(budget_data, ensure_ascii=False, indent=4).encode('utf-8')
-        st.session_state.json_download_data = json_output # Almacenamos los bytes del JSON en el estado
-        st.success("Plantilla JSON generada. Haz clic en el botón 'Descargar Plantilla JSON' de abajo.")
+        st.session_state.json_download_data = json_output # Almacenamos los bytes del JSON
+        st.success("Plantilla JSON generada. Puedes descargarla abajo.")
 
 
-# --- Mostrar botones de descarga solo si hay datos disponibles en el estado ---
-# Estos botones se renderizarán en la siguiente ejecución del script si se generaron datos con éxito
-# y se almacenaron en st.session_state.
-if st.session_state.pdf_download_data is not None and st.session_state.download_filename_base != "":
+# --- Mostrar botones de descarga ---
+# Estos botones solo se renderizan y se muestran si st.session_state.pdf_download_data NO es None
+# y el nombre del archivo base está definido (lo que indica una generación exitosa).
+# Se usan los datos del estado de la sesión que se actualizaron en la ejecución anterior.
+if st.session_state.pdf_download_data is not None and st.session_state.download_filename_base:
     st.download_button(
         label="Descargar PDF",
         data=st.session_state.pdf_download_data,
@@ -370,7 +363,7 @@ if st.session_state.pdf_download_data is not None and st.session_state.download_
         key="download_pdf_button"
     )
 
-if st.session_state.json_download_data is not None and st.session_state.download_filename_base != "":
+if st.session_state.json_download_data is not None and st.session_state.download_filename_base:
     st.download_button(
         label="Descargar Plantilla JSON",
         data=st.session_state.json_download_data,
