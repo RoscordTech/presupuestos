@@ -33,6 +33,15 @@ def initialize_session_state():
         st.session_state.notas = ""
     if 'aplicar_iva' not in st.session_state:
         st.session_state.aplicar_iva = True
+    
+    # Inicialización de variables para las descargas
+    if 'pdf_download_data' not in st.session_state:
+        st.session_state.pdf_download_data = None
+    if 'json_download_data' not in st.session_state:
+        st.session_state.json_download_data = None
+    if 'download_filename_base' not in st.session_state:
+        st.session_state.download_filename_base = ""
+
 
 # --- Función para generar el PDF con fpdf2 ---
 def generate_pdf_bytes(data):
@@ -216,11 +225,10 @@ if uploaded_file is not None:
         st.session_state.cliente = data.get("cliente", st.session_state.cliente)
         st.session_state.detalles = data.get("detalles", st.session_state.detalles)
         
-        # Asegurarse de que los conceptos se carguen correctamente y sean una lista
         if isinstance(data.get("conceptos"), list):
             st.session_state.conceptos = data.get("conceptos")
         else:
-            st.session_state.conceptos = [{"descripcion": "", "cantidad": "", "precio": ""}] # Resetea si el formato no es lista
+            st.session_state.conceptos = [{"descripcion": "", "cantidad": "", "precio": ""}] 
 
         st.session_state.notas = data.get("notas", "")
         st.session_state.aplicar_iva = data.get("aplicar_iva", True)
@@ -263,9 +271,8 @@ new_conceptos = []
 deleted_indices = set() 
 
 for i, concepto in enumerate(st.session_state.conceptos):
-    # Condición para evitar procesar conceptos que ya han sido marcados para eliminación
-    if i in deleted_indices:
-        continue # Saltar este concepto en la lista a procesar
+    if i in deleted_indices: # Si el concepto ya está marcado para eliminación, lo saltamos
+        continue 
 
     cols = st.columns([0.6, 0.15, 0.15, 0.1])
     with cols[0]:
@@ -277,19 +284,14 @@ for i, concepto in enumerate(st.session_state.conceptos):
         precio_str = st.text_input(f"Precio_{i}", value=str(concepto["precio"]), label_visibility="collapsed", key=f"precio_{i}")
         precio = float(precio_str) if precio_str.replace('.', '', 1).isdigit() else 0.0
     with cols[3]:
-        # El botón de borrar. st.button devuelve True si fue clickeado en esta ejecución
         if st.button("X", key=f"delete_btn_{i}"):
-            deleted_indices.add(i) # Marcar para eliminación
-            # No necesitamos un `st.experimental_rerun()` aquí porque el ajuste de la lista
-            # y el rerun condicional se hará después de este bucle.
+            deleted_indices.add(i) 
 
     new_conceptos.append({"descripcion": desc, "cantidad": cant, "precio": precio})
 
 # Reconstruir la lista de conceptos después de procesar todas las filas
-# Solo incluimos los conceptos que no fueron marcados para eliminación
 st.session_state.conceptos = [c for i, c in enumerate(new_conceptos) if i not in deleted_indices]
 
-# Si se marcó algún elemento para borrar, forzar un rerun para que la UI se actualice
 if deleted_indices:
     st.experimental_rerun()
 
@@ -317,6 +319,11 @@ st.markdown("---")
 
 # --- Botón de Generar PDF y JSON (Los botones de descarga se crean aquí directamente) ---
 if st.button("GENERAR PRESUPUESTO"):
+    # Limpiamos los datos de descarga anteriores del estado de la sesión
+    st.session_state.pdf_download_data = None
+    st.session_state.json_download_data = None
+    st.session_state.download_filename_base = "" # Limpiamos el nombre base del archivo
+
     budget_data = {
         "empresa": st.session_state.empresa,
         "cliente": st.session_state.cliente,
@@ -330,27 +337,44 @@ if st.button("GENERAR PRESUPUESTO"):
     numero_limpio = "".join(c for c in budget_data["detalles"]["numero"] if c.isalnum() or c in ('-', '_')).rstrip()
     cliente_limpio = "".join(c for c in budget_data["cliente"]["nombre"] if c.isalnum() or c in ('-', '_')).rstrip()
     filename_base = f"Presupuesto_{numero_limpio}_{cliente_limpio}"
+    st.session_state.download_filename_base = filename_base # Guardamos el nombre base en el estado
 
     pdf_output = generate_pdf_bytes(budget_data)
     if pdf_output:
-        st.download_button(
-            label="Descargar PDF",
-            data=pdf_output,
-            file_name=f"{filename_base}.pdf",
-            mime="application/pdf",
-            key="download_pdf_button"
-        )
-        st.success("PDF generado. Haz clic en el botón 'Descargar PDF' de arriba.")
+        st.session_state.pdf_download_data = pdf_output # Almacenamos los bytes del PDF en el estado
+        st.success("PDF generado. Haz clic en el botón 'Descargar PDF' de abajo.")
     else:
         st.error("No se pudo generar el PDF. Revisa los mensajes de error.")
+        # Si el PDF falla, es posible que el JSON también falle o no se necesite,
+        # así que no generamos el JSON si el PDF no se pudo hacer.
+        # Podrías cambiar esto si quieres que el JSON se genere siempre.
 
 
-    json_output = json.dumps(budget_data, ensure_ascii=False, indent=4).encode('utf-8')
-    # El botón JSON siempre debería ser generable si la generación de datos es exitosa.
+    # Generar JSON editable si el PDF se generó, o si quieres que se genere siempre
+    # He movido la generación del JSON y su botón AQUI para que siempre se generen juntos
+    if pdf_output: # O si quieres que el JSON se genere siempre, elimina esta línea 'if pdf_output:'
+        json_output = json.dumps(budget_data, ensure_ascii=False, indent=4).encode('utf-8')
+        st.session_state.json_download_data = json_output # Almacenamos los bytes del JSON en el estado
+        st.success("Plantilla JSON generada. Haz clic en el botón 'Descargar Plantilla JSON' de abajo.")
+
+
+# --- Mostrar botones de descarga solo si hay datos disponibles en el estado ---
+# Estos botones se renderizarán en la siguiente ejecución del script si se generaron datos con éxito
+# y se almacenaron en st.session_state.
+if st.session_state.pdf_download_data is not None and st.session_state.download_filename_base != "":
+    st.download_button(
+        label="Descargar PDF",
+        data=st.session_state.pdf_download_data,
+        file_name=f"{st.session_state.download_filename_base}.pdf",
+        mime="application/pdf",
+        key="download_pdf_button"
+    )
+
+if st.session_state.json_download_data is not None and st.session_state.download_filename_base != "":
     st.download_button(
         label="Descargar Plantilla JSON",
-        data=json_output,
-        file_name=f"Plantilla_{filename_base}.json",
+        data=st.session_state.json_download_data,
+        file_name=f"Plantilla_{st.session_state.download_filename_base}.json",
         mime="application/json",
         key="download_json_button"
     )
