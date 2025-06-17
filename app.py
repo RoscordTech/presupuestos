@@ -33,7 +33,9 @@ class PDF(FPDF):
             self.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
             self.add_font('DejaVu', 'B', 'DejaVuSansCondensed-Bold.ttf', uni=True)
         except RuntimeError:
-            st.error("Error: Archivos de fuente (DejaVuSansCondensed.ttf, DejaVuSansCondensed-Bold.ttf) no encontrados.")
+            # Este error es improbable en Streamlit Cloud si los archivos están presentes,
+            # pero es una buena práctica manejarlo.
+            st.error("Error Crítico: Archivos de fuente (DejaVuSansCondensed.ttf) no encontrados.")
             return
 
         if self.logo_path and os.path.exists(self.logo_path):
@@ -71,7 +73,9 @@ class PDF(FPDF):
 
     def footer(self):
         self.set_y(-15)
-        if 'DejaVu' in self.font_families:
+        # <<-- CORRECCIÓN AQUÍ (AttributeError) -->>
+        # Se comprueba 'dejavu' (en minúsculas) en el diccionario self.fonts
+        if 'dejavu' in self.fonts:
             self.set_font('DejaVu', '', 8)
             self.cell(0, 10, 'Gracias por su confianza.', 0, 0, 'C')
 
@@ -102,7 +106,7 @@ def inicializar_estado():
     if 'nombres_archivos' not in st.session_state: st.session_state.nombres_archivos = {}
 
 def limpiar_nombre_archivo(nombre):
-    return re.sub(r'[^a-zA-Z0-9_.-]', '_', nombre)
+    return re.sub(r'[^a-zA-Z0-9_.-]', '_', str(nombre))
 
 def cargar_datos_desde_json(archivo_cargado):
     try:
@@ -165,7 +169,7 @@ def crear_pdf_presupuesto(datos_presupuesto):
         y_pos = pdf.get_y()
         pdf.multi_cell(col_widths['desc'], 8, str(item['descripcion']), border='LR', align='L', fill=fill)
         y_after_multicell = pdf.get_y()
-        cell_height = y_after_multicell - y_pos
+        cell_height = max(8, y_after_multicell - y_pos) # Asegurar altura mínima
         pdf.set_xy(x_pos + col_widths['desc'], y_pos)
         pdf.cell(col_widths['cant'], cell_height, str(item['cantidad']), 1, 0, 'C', fill=fill)
         pdf.cell(col_widths['precio'], cell_height, f"{item['precio']:.2f}", 1, 0, 'R', fill=fill)
@@ -185,8 +189,6 @@ def crear_pdf_presupuesto(datos_presupuesto):
 
     pdf.set_font('DejaVu', 'B', 12)
     pdf.cell(130, 8, 'TOTAL:', 0, 0, 'R')
-    # <<-- CORRECCIÓN AQUÍ -->>
-    # Se ha corregido el nombre de la variable de 'datos_prespuesto' a 'datos_presupuesto'.
     pdf.cell(60, 8, f"{datos_presupuesto['resumen']['total']:.2f} €", 0, 1, 'R')
     
     if datos_presupuesto['opciones']['notas']:
@@ -203,7 +205,8 @@ inicializar_estado()
 
 with st.sidebar:
     if os.path.exists(st.session_state.empresa_logo):
-        st.image(st.session_state.empresa_logo, use_column_width=True)
+        # <<-- CORRECCIÓN AQUÍ (Advertencia de Deprecación) -->>
+        st.image(st.session_state.empresa_logo, use_container_width=True)
     
     st.header("Cargar Presupuesto")
     archivo_cargado = st.file_uploader("Sube un archivo .json para editar", type="json")
