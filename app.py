@@ -16,7 +16,6 @@ st.set_page_config(
 )
 
 # --- CLASE PDF PERSONALIZADA (con fpdf2) ---
-# Hereda de FPDF para crear una plantilla base con encabezado y pie de página
 class PDF(FPDF):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -25,23 +24,18 @@ class PDF(FPDF):
         self.logo_path = ""
 
     def set_datos(self, datos_empresa, datos_cliente, logo_path):
-        """Guarda los datos de la empresa y cliente para usarlos en el header."""
         self.datos_empresa = datos_empresa
         self.datos_cliente = datos_cliente
         self.logo_path = logo_path
 
     def header(self):
-        """Define el encabezado del PDF."""
-        # Cargar fuentes Unicode
-        # Asegúrate de que los archivos .ttf estén en la misma carpeta que app.py
         try:
             self.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
             self.add_font('DejaVu', 'B', 'DejaVuSansCondensed-Bold.ttf', uni=True)
         except RuntimeError:
-            st.error("Error: Archivos de fuente (DejaVuSansCondensed.ttf, DejaVuSansCondensed-Bold.ttf) no encontrados. Asegúrate de que estén en la misma carpeta que app.py.")
-            return # Detener la creación del header si no hay fuentes
+            st.error("Error: Archivos de fuente (DejaVuSansCondensed.ttf, DejaVuSansCondensed-Bold.ttf) no encontrados.")
+            return
 
-        # --- Logo ---
         if self.logo_path and os.path.exists(self.logo_path):
             try:
                 with Image.open(self.logo_path) as img:
@@ -54,8 +48,6 @@ class PDF(FPDF):
                 pass
         
         self.set_y(40)
-
-        # --- Datos de Empresa y Cliente ---
         self.set_font('DejaVu', '', 10)
         top_y = self.get_y()
         self.set_xy(10, top_y)
@@ -78,17 +70,13 @@ class PDF(FPDF):
         self.ln(20)
 
     def footer(self):
-        """Define el pie de página del PDF."""
         self.set_y(-15)
-        # Solo establece la fuente si ha sido añadida
         if 'DejaVu' in self.font_families:
             self.set_font('DejaVu', '', 8)
             self.cell(0, 10, 'Gracias por su confianza.', 0, 0, 'C')
 
 # --- FUNCIONES AUXILIARES ---
-
 def inicializar_estado():
-    """Inicializa st.session_state si no existe."""
     if 'conceptos' not in st.session_state:
         st.session_state.conceptos = [{'descripcion': '', 'cantidad': 1.0, 'precio': 0.0}]
     
@@ -114,11 +102,9 @@ def inicializar_estado():
     if 'nombres_archivos' not in st.session_state: st.session_state.nombres_archivos = {}
 
 def limpiar_nombre_archivo(nombre):
-    """Limpia una cadena para que sea un nombre de archivo válido."""
     return re.sub(r'[^a-zA-Z0-9_.-]', '_', nombre)
 
 def cargar_datos_desde_json(archivo_cargado):
-    """Carga los datos de un archivo JSON y actualiza el estado de la sesión."""
     try:
         datos = json.load(archivo_cargado)
         
@@ -146,7 +132,6 @@ def cargar_datos_desde_json(archivo_cargado):
         st.error(f"❌ Error al cargar el archivo JSON: {e}")
 
 def crear_pdf_presupuesto(datos_presupuesto):
-    """Genera el archivo PDF con los datos del presupuesto."""
     pdf = PDF()
     pdf.set_datos(
         datos_presupuesto['empresa'], 
@@ -200,7 +185,9 @@ def crear_pdf_presupuesto(datos_presupuesto):
 
     pdf.set_font('DejaVu', 'B', 12)
     pdf.cell(130, 8, 'TOTAL:', 0, 0, 'R')
-    pdf.cell(60, 8, f"{datos_prespuesto['resumen']['total']:.2f} €", 0, 1, 'R')
+    # <<-- CORRECCIÓN AQUÍ -->>
+    # Se ha corregido el nombre de la variable de 'datos_prespuesto' a 'datos_presupuesto'.
+    pdf.cell(60, 8, f"{datos_presupuesto['resumen']['total']:.2f} €", 0, 1, 'R')
     
     if datos_presupuesto['opciones']['notas']:
         pdf.ln(10)
@@ -212,11 +199,9 @@ def crear_pdf_presupuesto(datos_presupuesto):
     return pdf.output(dest='S').encode('latin-1')
 
 # --- INTERFAZ DE USUARIO ---
-
 inicializar_estado()
 
 with st.sidebar:
-    # Logo dinámico en la barra lateral
     if os.path.exists(st.session_state.empresa_logo):
         st.image(st.session_state.empresa_logo, use_column_width=True)
     
@@ -231,9 +216,6 @@ with st.sidebar:
 
 st.title("📄 Generador de Presupuestos Profesional")
 
-# <<-- CAMBIO: La gestión de conceptos se mueve FUERA del formulario -->>
-# Esto permite añadir/eliminar ítems sin estar restringido por la lógica del formulario.
-
 st.subheader("Conceptos del Presupuesto")
 base_imponible = 0.0
 
@@ -243,7 +225,6 @@ col_cant.write("**Cantidad**")
 col_precio.write("**Precio (€)**")
 col_total.write("**Total (€)**")
 
-# Bucle para mostrar y gestionar cada concepto
 for i, item in enumerate(st.session_state.conceptos):
     with st.container():
         col1, col2, col3, col4, col5 = st.columns([4, 1, 1, 1, 0.5])
@@ -267,7 +248,6 @@ for i, item in enumerate(st.session_state.conceptos):
         col4.text(f"{total_item:.2f} €")
         base_imponible += total_item
         
-        # Botón para eliminar (ahora fuera del form, funciona correctamente)
         if col5.button("❌", key=f"{key_prefix}_del", help="Eliminar este concepto"):
             st.session_state.conceptos.pop(i)
             st.rerun()
@@ -278,7 +258,6 @@ if st.button("➕ Añadir Concepto"):
 
 st.divider()
 
-# <<-- CAMBIO: El resumen de totales también se mueve fuera para actualizarse en tiempo real -->>
 st.subheader("Resumen de Totales")
 iva_check = st.checkbox("Calcular IVA (21%)", key="aplicar_iva")
 iva = base_imponible * 0.21 if iva_check else 0.0
@@ -291,7 +270,6 @@ col_total.metric(label="**TOTAL**", value=f"**{total_final:.2f} €**")
 
 st.divider()
 
-# <<-- CAMBIO: El formulario ahora solo agrupa los campos de datos estáticos y el botón de envío -->>
 with st.form(key="presupuesto_form"):
     st.subheader("Datos para el Presupuesto")
     col_empresa, col_cliente = st.columns(2)
