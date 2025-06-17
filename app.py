@@ -10,7 +10,7 @@ def initialize_session_state():
         st.session_state.empresa = {
             "nombre": "SERVICIO TECNICO ERB",
             "nif": "60379728J",
-            # CORRECCIÓN: Cambiado "–" por "-" para evitar error de fuente en PDF
+            # Se mantiene el guion normal, pero la fuente Unicode permitirá más caracteres.
             "direccion": "CL RAMBLA BRASIL, 7 D EN 4\n08028 - BARCELONA", 
             "telefono": "",
             "email": "",
@@ -35,47 +35,52 @@ def initialize_session_state():
         st.session_state.aplicar_iva = True
 
 # --- Función para generar el PDF con fpdf2 ---
-# Ahora dibujamos directamente en el PDF en lugar de usar HTML.
 def generate_pdf_bytes(data):
     try:
         pdf = FPDF()
         pdf.add_page()
-        # Puedes intentar usar una fuente Unicode si helvetica da problemas con otros caracteres
-        # Por ejemplo, si tienes un archivo de fuente .ttf que soporte UTF-8:
-        # pdf.add_font("DejaVuSans", "", "DejaVuSansCondensed.ttf", uni=True)
-        # pdf.set_font("DejaVuSans", size=10)
-        # Por ahora, nos quedamos con helvetica y asumimos caracteres ASCII o reemplazados.
-        pdf.set_font("helvetica", size=10)
+        
+        # --- AÑADIDO: Cargar una fuente Unicode para soportar caracteres especiales ---
+        # 1. Añade tu archivo .ttf aquí. Por ejemplo, "DejaVuSansCondensed.ttf"
+        # 2. El segundo "" es el estilo (normal). "DejaVuSans" es el nombre que le das.
+        # 3. uni=True es CRUCIAL para que soporte Unicode.
+        # Asegúrate de que el archivo 'DejaVuSansCondensed.ttf' esté en la misma carpeta que 'app.py'
+        try:
+            pdf.add_font("DejaVuSans", "", "DejaVuSansCondensed.ttf", uni=True)
+            pdf.add_font("DejaVuSans", "B", "DejaVuSansCondensed-Bold.ttf", uni=True) # Para negrita si existe
+            pdf.add_font("DejaVuSans", "I", "DejaVuSansCondensed-Oblique.ttf", uni=True) # Para cursiva si existe
+        except Exception as e:
+            st.error(f"Error al cargar la fuente DejaVuSans. Asegúrate de que los archivos TTF estén en la carpeta raíz y sean correctos. Usando Helvetica como fallback. Error: {e}")
+            pdf.set_font("helvetica", size=10) # Fallback si la fuente personalizada falla
+            st.warning("Se ha usado Helvetica. Puede que algunos caracteres no se muestren.")
+            
+        pdf.set_font("DejaVuSans", size=10) # <--- AHORA USAREMOS ESTA FUENTE EN TODAS PARTES
 
-        # Configuración de márgenes y posiciones (ajusta si es necesario)
+        # Configuración de márgenes y posiciones
         margin = 20
         col1_x = margin
-        col2_x = 100 # Columna para datos del cliente
+        col2_x = 100 
         current_y = 20
 
         # --- Logo ---
         logo_path = os.path.join(os.path.dirname(__file__), data["empresa"]["logo_file"])
         if os.path.exists(logo_path):
             try:
-                # fpdf2 puede usar PNG, JPG, etc. directamente si Pillow está instalado.
-                # Ajusta las coordenadas y el tamaño del logo según necesites
-                # x=(pdf.w - 30) / 2 para centrar la imagen de 30mm de ancho
                 pdf.image(logo_path, x=(pdf.w - 30) / 2, y=current_y, w=30)
-                current_y += 35 # Espacio después del logo
+                current_y += 35 
             except Exception as e:
                 st.warning(f"No se pudo incrustar el logo. Error: {e}")
-                current_y += 10 # Dejar un pequeño espacio
+                current_y += 10 
         else:
             st.warning(f"Archivo de logo no encontrado: {logo_path}")
-            current_y += 10 # Dejar un pequeño espacio
+            current_y += 10 
 
         # --- Datos de la Empresa ---
-        pdf.set_font("helvetica", "B", 12)
+        pdf.set_font("DejaVuSans", "B", 12) # Usando DejaVuSans en negrita
         pdf.set_xy(col1_x, current_y)
-        # multi_cell es para texto que puede ocupar varias líneas
         pdf.multi_cell(0, 5, data["empresa"]["nombre"]) 
-        pdf.set_font("helvetica", "", 10)
-        current_y = pdf.get_y() # Obtener la posición Y actual después del multi_cell
+        pdf.set_font("DejaVuSans", "", 10) # Usando DejaVuSans normal
+        current_y = pdf.get_y() 
         pdf.set_xy(col1_x, current_y)
         pdf.multi_cell(0, 5, data["empresa"]["direccion"])
         pdf.set_xy(col1_x, pdf.get_y())
@@ -87,11 +92,11 @@ def generate_pdf_bytes(data):
 
         # --- Datos del Cliente ---
         client_y = current_y
-        pdf.set_font("helvetica", "B", 12)
+        pdf.set_font("DejaVuSans", "B", 12)
         pdf.set_xy(col2_x, client_y)
         pdf.cell(0, 5, "DATOS DEL CLIENTE")
         client_y += 7
-        pdf.set_font("helvetica", "", 10)
+        pdf.set_font("DejaVuSans", "", 10)
         pdf.set_xy(col2_x, client_y)
         pdf.cell(0, 5, f"Nombre: {data['cliente']['nombre']}")
         client_y += 5
@@ -100,103 +105,93 @@ def generate_pdf_bytes(data):
         pdf.set_xy(col2_x, pdf.get_y())
         pdf.cell(0, 5, f"DNI: {data['cliente']['dni']}")
         
-        # Asegura que current_y avance lo suficiente para la siguiente sección
         current_y = max(pdf.get_y(), client_y + 20) + 10 
 
 
         # --- Detalles del Presupuesto (Número y Fecha) ---
-        pdf.set_font("helvetica", "B", 16)
+        pdf.set_font("DejaVuSans", "B", 16)
         pdf.set_xy(col2_x + 30, current_y)
         pdf.cell(0, 10, "PRESUPUESTO")
-        pdf.set_font("helvetica", "", 10)
+        pdf.set_font("DejaVuSans", "", 10)
         pdf.set_xy(col2_x + 30, current_y + 10)
         pdf.cell(0, 10, f"Nº Presupuesto: {data['detalles']['numero']}")
         pdf.set_xy(col2_x + 30, current_y + 15)
         pdf.cell(0, 10, f"Fecha: {data['detalles']['fecha']}")
         current_y += 30
 
-        pdf.ln(10) # Salto de línea
+        pdf.ln(10) 
 
         # --- Tabla de Conceptos ---
-        table_headers = ["Descripción", "Cantidad", "P. Unitario (€)", "Total (€)"]
-        col_widths = [80, 25, 30, 30] # Ancho de las columnas en mm
+        table_headers = ["Descripción", "Cantidad", "P. Unitario (€)", "Total (€)"] # El € aquí ya debería funcionar
+        col_widths = [80, 25, 30, 30] 
 
         # Dibujar encabezados de la tabla
-        pdf.set_fill_color(224, 224, 224) # Color de fondo gris claro
-        pdf.set_font("helvetica", "B", 10)
+        pdf.set_fill_color(224, 224, 224) 
+        pdf.set_font("DejaVuSans", "B", 10) # Usando DejaVuSans en negrita para encabezados
         x_pos = margin
         for i, header in enumerate(table_headers):
             pdf.set_xy(x_pos, current_y + 10)
-            # cell(width, height, text, border, ln, align, fill)
             pdf.cell(col_widths[i], 10, header, 1, 0, 'C', True) 
             x_pos += col_widths[i]
-        pdf.ln(10) # Salto de línea después de los encabezados (ln=10mm)
-        current_y = pdf.get_y() # Actualiza Y a la posición después de los encabezados
+        pdf.ln(10) 
+        current_y = pdf.get_y() 
 
         # Dibujar filas de conceptos
-        pdf.set_font("helvetica", "", 10)
+        pdf.set_font("DejaVuSans", "", 10) # Usando DejaVuSans normal para filas
         for i, item in enumerate(data["conceptos"]):
-            # Establecer color de fondo alterno para las filas
             pdf.set_fill_color(255, 255, 255) if i % 2 == 0 else pdf.set_fill_color(245, 245, 245)
             x_pos = margin
             
-            # Descripción (multi_cell para permitir varias líneas)
             pdf.set_xy(x_pos, current_y)
-            # El multi_cell devuelve la altura que ocupó el texto
             pdf.multi_cell(col_widths[0], 6, str(item["descripcion"]), 1, 'L', True)
-            desc_height = pdf.get_y() - current_y # Calcula la altura real ocupada por la descripción
+            desc_height = pdf.get_y() - current_y 
             
-            # Cantidad (la altura de la celda debe ser la misma que la descripción)
             pdf.set_xy(x_pos + col_widths[0], current_y)
             pdf.cell(col_widths[1], desc_height, str(item["cantidad"]), 1, 0, 'C', True)
             
-            # Precio Unitario
             pdf.set_xy(x_pos + col_widths[0] + col_widths[1], current_y)
             pdf.cell(col_widths[2], desc_height, f"{item['precio']:.2f}", 1, 0, 'C', True)
             
-            # Total por item
             item_total = item["cantidad"] * item["precio"]
             pdf.set_xy(x_pos + col_widths[0] + col_widths[1] + col_widths[2], current_y)
             pdf.cell(col_widths[3], desc_height, f"{item_total:.2f}", 1, 0, 'C', True)
             
-            current_y += desc_height # Mover Y para la siguiente fila
+            current_y += desc_height 
 
-        pdf.ln(10) # Salto de línea después de la tabla
+        pdf.ln(10) 
 
         # --- Totales ---
-        pdf.set_font("helvetica", "", 10)
-        # Mueve la posición X para alinear los totales a la derecha
-        pdf.set_x(pdf.w - margin - 50) # Ajusta este 50 para alinear bien
+        pdf.set_font("DejaVuSans", "", 10) 
+        pdf.set_x(pdf.w - margin - 50) 
         pdf.cell(0, 7, f"Base Imponible: {data['totales']['base_imponible']:.2f} €", 0, 1, 'R')
         pdf.set_x(pdf.w - margin - 50)
         pdf.cell(0, 7, f"IVA (21%): {data['totales']['iva']:.2f} €", 0, 1, 'R')
         pdf.set_x(pdf.w - margin - 50)
-        pdf.set_font("helvetica", "B", 12)
-        pdf.cell(0, 10, f"TOTAL: {data['totales']['total']:.2f} €", 'T', 1, 'R') # 'T' para borde superior
+        pdf.set_font("DejaVuSans", "B", 12) 
+        pdf.cell(0, 10, f"TOTAL: {data['totales']['total']:.2f} €", 'T', 1, 'R') 
 
         pdf.ln(10)
 
         # --- Notas ---
-        pdf.set_font("helvetica", "B", 10)
+        pdf.set_font("DejaVuSans", "B", 10) 
         pdf.set_x(margin)
         pdf.cell(0, 5, "Notas y Condiciones:")
         pdf.ln(7)
-        pdf.set_font("helvetica", "", 9)
+        pdf.set_font("DejaVuSans", "", 9) 
         pdf.set_x(margin)
-        pdf.multi_cell(pdf.w - 2 * margin, 4, data['notas']) # multi_cell para texto largo
+        pdf.multi_cell(pdf.w - 2 * margin, 4, data['notas']) 
 
         # --- Pie de página ---
-        pdf.set_font("helvetica", "I", 8)
-        pdf.set_xy(margin, pdf.h - 15) # Posición cerca del final de la página
+        pdf.set_font("DejaVuSans", "I", 8) 
+        pdf.set_xy(margin, pdf.h - 15) 
         pdf.cell(0, 10, "Gracias por su confianza.", 0, 0, 'C')
 
         # Devolver el PDF como bytes
-        # 'S' devuelve el PDF como una cadena, luego la codificamos a bytes.
         return pdf.output(dest='S').encode('latin-1') 
 
     except Exception as e:
         st.error(f"Ocurrió un error al generar el PDF: {e}")
-        st.exception(e) # Muestra el traceback completo en los logs de Streamlit
+        st.exception(e) 
         return None
 
 # --- Configuración inicial de la página de Streamlit ---
@@ -230,13 +225,12 @@ if uploaded_file is not None:
 # --- Formulario Principal ---
 
 # Sección: Datos de tu Empresa
-st.subheader("Datos de tu Empresa") # Cambiado a subheader para un tamaño más pequeño
+st.subheader("Datos de tu Empresa") 
 st.session_state.empresa["nombre"] = st.text_input("Nombre:", value=st.session_state.empresa["nombre"], key="empresa_nombre")
 st.session_state.empresa["nif"] = st.text_input("NIF/CIF:", value=st.session_state.empresa["nif"], key="empresa_nif")
 st.session_state.empresa["direccion"] = st.text_area("Dirección:", value=st.session_state.empresa["direccion"], key="empresa_direccion")
 st.session_state.empresa["telefono"] = st.text_input("Teléfono:", value=st.session_state.empresa["telefono"], key="empresa_telefono")
 st.session_state.empresa["email"] = st.text_input("Email:", value=st.session_state.empresa["email"], key="empresa_email")
-# El logo_file ahora solo se usa como referencia visual, no para previsualizar aquí.
 st.session_state.empresa["logo_file"] = st.text_input("Nombre del archivo del Logo (ej. logo.png):", value=st.session_state.empresa["logo_file"], key="empresa_logo_file")
 
 
@@ -259,13 +253,10 @@ with col2: st.write("**Cant.**")
 with col3: st.write("**Precio (€)**")
 with col4: st.write("") # Columna para el botón de borrar
 
-# Para cada concepto en la lista, creamos una fila de campos
 new_conceptos = []
-# Mantener un registro de los índices borrados
 deleted_indices = set() 
 
 for i, concepto in enumerate(st.session_state.conceptos):
-    # Solo mostrar si no fue marcado para borrarse en la ejecución actual
     if i not in deleted_indices:
         cols = st.columns([0.6, 0.15, 0.15, 0.1])
         with cols[0]:
@@ -277,24 +268,20 @@ for i, concepto in enumerate(st.session_state.conceptos):
             precio_str = st.text_input(f"Precio_{i}", value=str(concepto["precio"]), label_visibility="collapsed", key=f"precio_{i}")
             precio = float(precio_str) if precio_str.replace('.', '', 1).isdigit() else 0.0
         with cols[3]:
-            # El botón de borrar. st.button devuelve True si fue clickeado en esta ejecución
             if st.button("X", key=f"delete_btn_{i}"):
-                deleted_indices.add(i) # Marcar para eliminación
+                deleted_indices.add(i) 
 
-        # Agregamos a la lista temporal si no está marcado para eliminación
         new_conceptos.append({"descripcion": desc, "cantidad": cant, "precio": precio})
 
-# Reconstruir la lista de conceptos después de procesar todas las filas
 st.session_state.conceptos = [c for i, c in enumerate(new_conceptos) if i not in deleted_indices]
 
-# Si se marcó algún elemento para borrar, forzar un rerun para que la UI se actualice
 if deleted_indices:
     st.experimental_rerun()
 
 
 if st.button("Añadir Concepto"):
     st.session_state.conceptos.append({"descripcion": "", "cantidad": "", "precio": ""})
-    st.experimental_rerun() # Fuerza una nueva ejecución para actualizar la UI
+    st.experimental_rerun() 
 
 # Sección: Opciones y Finalización
 st.subheader("Opciones y Finalización")
@@ -306,7 +293,7 @@ subtotal = sum(c["cantidad"] * c["precio"] for c in st.session_state.conceptos i
 iva = subtotal * 0.21 if st.session_state.aplicar_iva else 0
 total = subtotal + iva
 
-st.markdown("---") # Una línea divisoria para separar
+st.markdown("---") 
 st.subheader("Resumen de Totales:")
 st.write(f"**Base Imponible:** {subtotal:.2f} €")
 st.write(f"**IVA (21%):** {iva:.2f} €")
@@ -315,7 +302,6 @@ st.markdown("---")
 
 # --- Botón de Generar PDF y JSON ---
 if st.button("GENERAR PRESUPUESTO"):
-    # Recolectar todos los datos para el PDF y JSON
     budget_data = {
         "empresa": st.session_state.empresa,
         "cliente": st.session_state.cliente,
@@ -326,13 +312,10 @@ if st.button("GENERAR PRESUPUESTO"):
         "totales": {"base_imponible": subtotal, "iva": iva, "total": total}
     }
 
-    # CORRECCIÓN: Definir filename_base antes de intentar generar el PDF,
-    # para que esté disponible para el JSON si el PDF falla.
     numero_limpio = "".join(c for c in budget_data["detalles"]["numero"] if c.isalnum() or c in ('-', '_')).rstrip()
     cliente_limpio = "".join(c for c in budget_data["cliente"]["nombre"] if c.isalnum() or c in ('-', '_')).rstrip()
     filename_base = f"Presupuesto_{numero_limpio}_{cliente_limpio}"
 
-    # Generar PDF
     pdf_output = generate_pdf_bytes(budget_data)
     if pdf_output:
         st.download_button(
@@ -347,7 +330,6 @@ if st.button("GENERAR PRESUPUESTO"):
         st.error("No se pudo generar el PDF. Revisa los mensajes de error.")
 
 
-    # Generar JSON editable
     json_output = json.dumps(budget_data, ensure_ascii=False, indent=4).encode('utf-8')
     st.download_button(
         label="Descargar Plantilla JSON",
