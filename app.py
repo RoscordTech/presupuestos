@@ -10,7 +10,6 @@ def initialize_session_state():
         st.session_state.empresa = {
             "nombre": "SERVICIO TECNICO ERB",
             "nif": "60379728J",
-            # Se mantiene el guion normal, pero la fuente Unicode permitirá más caracteres.
             "direccion": "CL RAMBLA BRASIL, 7 D EN 4\n08028 - BARCELONA", 
             "telefono": "",
             "email": "",
@@ -40,21 +39,34 @@ def generate_pdf_bytes(data):
         pdf = FPDF()
         pdf.add_page()
         
-        # --- AÑADIDO: Cargar una fuente Unicode para soportar caracteres especiales ---
-        # 1. Añade tu archivo .ttf aquí. Por ejemplo, "DejaVuSansCondensed.ttf"
-        # 2. El segundo "" es el estilo (normal). "DejaVuSans" es el nombre que le das.
-        # 3. uni=True es CRUCIAL para que soporte Unicode.
-        # Asegúrate de que el archivo 'DejaVuSansCondensed.ttf' esté en la misma carpeta que 'app.py'
+        # --- CORRECCIÓN: Cargar todas las variantes (normal, negrita, cursiva) de la fuente Unicode ---
+        # Asegúrate de que los archivos .ttf estén en la misma carpeta que 'app.py'
+        # Los nombres de archivo aquí DEBEN coincidir exactamente con los archivos que descargues.
+        font_name = "DejaVuSans" # Este es el nombre que usaremos para referenciar la fuente en set_font()
+        font_path_normal = "DejaVuSansCondensed.ttf"
+        font_path_bold = "DejaVuSansCondensed-Bold.ttf"
+        font_path_italic = "DejaVuSansCondensed-Oblique.ttf" # O "DejaVuSansCondensed-Italic.ttf"
+
         try:
-            pdf.add_font("DejaVuSans", "", "DejaVuSansCondensed.ttf", uni=True)
-            pdf.add_font("DejaVuSans", "B", "DejaVuSansCondensed-Bold.ttf", uni=True) # Para negrita si existe
-            pdf.add_font("DejaVuSans", "I", "DejaVuSansCondensed-Oblique.ttf", uni=True) # Para cursiva si existe
+            # Carga la versión normal de la fuente
+            pdf.add_font(font_name, "", font_path_normal, uni=True)
+            # Carga la versión negrita de la fuente (estilo "B")
+            pdf.add_font(font_name, "B", font_path_bold, uni=True) 
+            # Carga la versión cursiva de la fuente (estilo "I")
+            pdf.add_font(font_name, "I", font_path_italic, uni=True) 
+            # Carga la versión negrita y cursiva (estilo "BI")
+            # Esto es opcional, si tienes un archivo para BI, o si FPDF lo combina automáticamente.
+            # pdf.add_font(font_name, "BI", "DejaVuSansCondensed-BoldOblique.ttf", uni=True)
+
         except Exception as e:
-            st.error(f"Error al cargar la fuente DejaVuSans. Asegúrate de que los archivos TTF estén en la carpeta raíz y sean correctos. Usando Helvetica como fallback. Error: {e}")
+            st.error(f"Error al cargar una o más variantes de la fuente {font_name}. Asegúrate de que los archivos TTF estén en la carpeta raíz y los nombres de archivo sean correctos. Usando Helvetica como fallback. Error: {e}")
             pdf.set_font("helvetica", size=10) # Fallback si la fuente personalizada falla
-            st.warning("Se ha usado Helvetica. Puede que algunos caracteres no se muestren.")
-            
-        pdf.set_font("DejaVuSans", size=10) # <--- AHORA USAREMOS ESTA FUENTE EN TODAS PARTES
+            st.warning("Se ha usado Helvetica. Puede que algunos caracteres no se muestren correctamente.")
+            # Si el fallback a Helvetica ocurre, el resto de las llamadas a set_font() deben usar "helvetica"
+
+        # --- AHORA USAREMOS ESTA FUENTE (DejaVuSans) EN TODAS PARTES ---
+        # Asegúrate de usar el 'font_name' que definimos.
+        pdf.set_font(font_name, size=10) 
 
         # Configuración de márgenes y posiciones
         margin = 20
@@ -76,10 +88,10 @@ def generate_pdf_bytes(data):
             current_y += 10 
 
         # --- Datos de la Empresa ---
-        pdf.set_font("DejaVuSans", "B", 12) # Usando DejaVuSans en negrita
+        pdf.set_font(font_name, "B", 12) # Usando DejaVuSans en negrita
         pdf.set_xy(col1_x, current_y)
         pdf.multi_cell(0, 5, data["empresa"]["nombre"]) 
-        pdf.set_font("DejaVuSans", "", 10) # Usando DejaVuSans normal
+        pdf.set_font(font_name, "", 10) # Usando DejaVuSans normal
         current_y = pdf.get_y() 
         pdf.set_xy(col1_x, current_y)
         pdf.multi_cell(0, 5, data["empresa"]["direccion"])
@@ -92,11 +104,11 @@ def generate_pdf_bytes(data):
 
         # --- Datos del Cliente ---
         client_y = current_y
-        pdf.set_font("DejaVuSans", "B", 12)
+        pdf.set_font(font_name, "B", 12)
         pdf.set_xy(col2_x, client_y)
         pdf.cell(0, 5, "DATOS DEL CLIENTE")
         client_y += 7
-        pdf.set_font("DejaVuSans", "", 10)
+        pdf.set_font(font_name, "", 10)
         pdf.set_xy(col2_x, client_y)
         pdf.cell(0, 5, f"Nombre: {data['cliente']['nombre']}")
         client_y += 5
@@ -109,10 +121,10 @@ def generate_pdf_bytes(data):
 
 
         # --- Detalles del Presupuesto (Número y Fecha) ---
-        pdf.set_font("DejaVuSans", "B", 16)
+        pdf.set_font(font_name, "B", 16)
         pdf.set_xy(col2_x + 30, current_y)
         pdf.cell(0, 10, "PRESUPUESTO")
-        pdf.set_font("DejaVuSans", "", 10)
+        pdf.set_font(font_name, "", 10)
         pdf.set_xy(col2_x + 30, current_y + 10)
         pdf.cell(0, 10, f"Nº Presupuesto: {data['detalles']['numero']}")
         pdf.set_xy(col2_x + 30, current_y + 15)
@@ -122,12 +134,12 @@ def generate_pdf_bytes(data):
         pdf.ln(10) 
 
         # --- Tabla de Conceptos ---
-        table_headers = ["Descripción", "Cantidad", "P. Unitario (€)", "Total (€)"] # El € aquí ya debería funcionar
+        table_headers = ["Descripción", "Cantidad", "P. Unitario (€)", "Total (€)"] 
         col_widths = [80, 25, 30, 30] 
 
         # Dibujar encabezados de la tabla
         pdf.set_fill_color(224, 224, 224) 
-        pdf.set_font("DejaVuSans", "B", 10) # Usando DejaVuSans en negrita para encabezados
+        pdf.set_font(font_name, "B", 10) # Usando DejaVuSans en negrita para encabezados
         x_pos = margin
         for i, header in enumerate(table_headers):
             pdf.set_xy(x_pos, current_y + 10)
@@ -137,7 +149,7 @@ def generate_pdf_bytes(data):
         current_y = pdf.get_y() 
 
         # Dibujar filas de conceptos
-        pdf.set_font("DejaVuSans", "", 10) # Usando DejaVuSans normal para filas
+        pdf.set_font(font_name, "", 10) # Usando DejaVuSans normal para filas
         for i, item in enumerate(data["conceptos"]):
             pdf.set_fill_color(255, 255, 255) if i % 2 == 0 else pdf.set_fill_color(245, 245, 245)
             x_pos = margin
@@ -161,28 +173,28 @@ def generate_pdf_bytes(data):
         pdf.ln(10) 
 
         # --- Totales ---
-        pdf.set_font("DejaVuSans", "", 10) 
+        pdf.set_font(font_name, "", 10) 
         pdf.set_x(pdf.w - margin - 50) 
         pdf.cell(0, 7, f"Base Imponible: {data['totales']['base_imponible']:.2f} €", 0, 1, 'R')
         pdf.set_x(pdf.w - margin - 50)
         pdf.cell(0, 7, f"IVA (21%): {data['totales']['iva']:.2f} €", 0, 1, 'R')
         pdf.set_x(pdf.w - margin - 50)
-        pdf.set_font("DejaVuSans", "B", 12) 
+        pdf.set_font(font_name, "B", 12) 
         pdf.cell(0, 10, f"TOTAL: {data['totales']['total']:.2f} €", 'T', 1, 'R') 
 
         pdf.ln(10)
 
         # --- Notas ---
-        pdf.set_font("DejaVuSans", "B", 10) 
+        pdf.set_font(font_name, "B", 10) 
         pdf.set_x(margin)
         pdf.cell(0, 5, "Notas y Condiciones:")
         pdf.ln(7)
-        pdf.set_font("DejaVuSans", "", 9) 
+        pdf.set_font(font_name, "", 9) 
         pdf.set_x(margin)
         pdf.multi_cell(pdf.w - 2 * margin, 4, data['notas']) 
 
         # --- Pie de página ---
-        pdf.set_font("DejaVuSans", "I", 8) 
+        pdf.set_font(font_name, "I", 8) # Usando DejaVuSans en cursiva
         pdf.set_xy(margin, pdf.h - 15) 
         pdf.cell(0, 10, "Gracias por su confianza.", 0, 0, 'C')
 
