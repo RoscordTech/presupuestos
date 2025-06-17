@@ -1,3 +1,3 @@
 streamlit
-jinja2
-weasyprint
+fpdf2
+Pillow # fpdf2 necesita Pillow para trabajar con imágenes (tu logo)
