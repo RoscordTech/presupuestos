@@ -10,7 +10,8 @@ def initialize_session_state():
         st.session_state.empresa = {
             "nombre": "SERVICIO TECNICO ERB",
             "nif": "60379728J",
-            "direccion": "CL RAMBLA BRASIL, 7 D EN 4\n08028 – BARCELONA",
+            # CORRECCIÓN: Cambiado "–" por "-" para evitar error de fuente en PDF
+            "direccion": "CL RAMBLA BRASIL, 7 D EN 4\n08028 - BARCELONA", 
             "telefono": "",
             "email": "",
             "logo_file": "logo.png" # <--- ¡IMPORTANTE! Asegúrate que este sea el nombre EXACTO de tu archivo de logo (ej. logo.jpg)
@@ -39,6 +40,11 @@ def generate_pdf_bytes(data):
     try:
         pdf = FPDF()
         pdf.add_page()
+        # Puedes intentar usar una fuente Unicode si helvetica da problemas con otros caracteres
+        # Por ejemplo, si tienes un archivo de fuente .ttf que soporte UTF-8:
+        # pdf.add_font("DejaVuSans", "", "DejaVuSansCondensed.ttf", uni=True)
+        # pdf.set_font("DejaVuSans", size=10)
+        # Por ahora, nos quedamos con helvetica y asumimos caracteres ASCII o reemplazados.
         pdf.set_font("helvetica", size=10)
 
         # Configuración de márgenes y posiciones (ajusta si es necesario)
@@ -53,6 +59,7 @@ def generate_pdf_bytes(data):
             try:
                 # fpdf2 puede usar PNG, JPG, etc. directamente si Pillow está instalado.
                 # Ajusta las coordenadas y el tamaño del logo según necesites
+                # x=(pdf.w - 30) / 2 para centrar la imagen de 30mm de ancho
                 pdf.image(logo_path, x=(pdf.w - 30) / 2, y=current_y, w=30)
                 current_y += 35 # Espacio después del logo
             except Exception as e:
@@ -65,9 +72,10 @@ def generate_pdf_bytes(data):
         # --- Datos de la Empresa ---
         pdf.set_font("helvetica", "B", 12)
         pdf.set_xy(col1_x, current_y)
-        pdf.multi_cell(0, 5, data["empresa"]["nombre"])
+        # multi_cell es para texto que puede ocupar varias líneas
+        pdf.multi_cell(0, 5, data["empresa"]["nombre"]) 
         pdf.set_font("helvetica", "", 10)
-        current_y = pdf.get_y()
+        current_y = pdf.get_y() # Obtener la posición Y actual después del multi_cell
         pdf.set_xy(col1_x, current_y)
         pdf.multi_cell(0, 5, data["empresa"]["direccion"])
         pdf.set_xy(col1_x, pdf.get_y())
@@ -92,7 +100,8 @@ def generate_pdf_bytes(data):
         pdf.set_xy(col2_x, pdf.get_y())
         pdf.cell(0, 5, f"DNI: {data['cliente']['dni']}")
         
-        current_y = max(pdf.get_y(), client_y + 20) + 10 # Asegura suficiente espacio
+        # Asegura que current_y avance lo suficiente para la siguiente sección
+        current_y = max(pdf.get_y(), client_y + 20) + 10 
 
 
         # --- Detalles del Presupuesto (Número y Fecha) ---
@@ -110,31 +119,34 @@ def generate_pdf_bytes(data):
 
         # --- Tabla de Conceptos ---
         table_headers = ["Descripción", "Cantidad", "P. Unitario (€)", "Total (€)"]
-        col_widths = [80, 25, 30, 30] # Ancho de las columnas
+        col_widths = [80, 25, 30, 30] # Ancho de las columnas en mm
 
         # Dibujar encabezados de la tabla
-        pdf.set_fill_color(224, 224, 224) # Color de fondo gris
+        pdf.set_fill_color(224, 224, 224) # Color de fondo gris claro
         pdf.set_font("helvetica", "B", 10)
         x_pos = margin
         for i, header in enumerate(table_headers):
             pdf.set_xy(x_pos, current_y + 10)
-            pdf.cell(col_widths[i], 10, header, 1, 0, 'C', True) # 1 para borde, 0 para no salto de línea, C para centrado, True para fondo
+            # cell(width, height, text, border, ln, align, fill)
+            pdf.cell(col_widths[i], 10, header, 1, 0, 'C', True) 
             x_pos += col_widths[i]
-        pdf.ln(10) # Salto de línea después de los encabezados
-        current_y = pdf.get_y()
+        pdf.ln(10) # Salto de línea después de los encabezados (ln=10mm)
+        current_y = pdf.get_y() # Actualiza Y a la posición después de los encabezados
 
         # Dibujar filas de conceptos
         pdf.set_font("helvetica", "", 10)
         for i, item in enumerate(data["conceptos"]):
-            pdf.set_fill_color(255, 255, 255) if i % 2 == 0 else pdf.set_fill_color(245, 245, 245) # Fondo alterno
+            # Establecer color de fondo alterno para las filas
+            pdf.set_fill_color(255, 255, 255) if i % 2 == 0 else pdf.set_fill_color(245, 245, 245)
             x_pos = margin
             
-            # Descripción (multilínea si es necesario)
+            # Descripción (multi_cell para permitir varias líneas)
             pdf.set_xy(x_pos, current_y)
+            # El multi_cell devuelve la altura que ocupó el texto
             pdf.multi_cell(col_widths[0], 6, str(item["descripcion"]), 1, 'L', True)
-            desc_height = pdf.get_y() - current_y # Altura que ocupó la descripción
+            desc_height = pdf.get_y() - current_y # Calcula la altura real ocupada por la descripción
             
-            # Cantidad
+            # Cantidad (la altura de la celda debe ser la misma que la descripción)
             pdf.set_xy(x_pos + col_widths[0], current_y)
             pdf.cell(col_widths[1], desc_height, str(item["cantidad"]), 1, 0, 'C', True)
             
@@ -153,11 +165,12 @@ def generate_pdf_bytes(data):
 
         # --- Totales ---
         pdf.set_font("helvetica", "", 10)
-        pdf.set_x(col2_x + 30) # Mueve la posición X para alinear los totales a la derecha
+        # Mueve la posición X para alinear los totales a la derecha
+        pdf.set_x(pdf.w - margin - 50) # Ajusta este 50 para alinear bien
         pdf.cell(0, 7, f"Base Imponible: {data['totales']['base_imponible']:.2f} €", 0, 1, 'R')
-        pdf.set_x(col2_x + 30)
+        pdf.set_x(pdf.w - margin - 50)
         pdf.cell(0, 7, f"IVA (21%): {data['totales']['iva']:.2f} €", 0, 1, 'R')
-        pdf.set_x(col2_x + 30)
+        pdf.set_x(pdf.w - margin - 50)
         pdf.set_font("helvetica", "B", 12)
         pdf.cell(0, 10, f"TOTAL: {data['totales']['total']:.2f} €", 'T', 1, 'R') # 'T' para borde superior
 
@@ -178,7 +191,8 @@ def generate_pdf_bytes(data):
         pdf.cell(0, 10, "Gracias por su confianza.", 0, 0, 'C')
 
         # Devolver el PDF como bytes
-        return pdf.output(dest='S').encode('latin-1') # 'S' devuelve como cadena, luego codifica a bytes
+        # 'S' devuelve el PDF como una cadena, luego la codificamos a bytes.
+        return pdf.output(dest='S').encode('latin-1') 
 
     except Exception as e:
         st.error(f"Ocurrió un error al generar el PDF: {e}")
@@ -312,13 +326,15 @@ if st.button("GENERAR PRESUPUESTO"):
         "totales": {"base_imponible": subtotal, "iva": iva, "total": total}
     }
 
+    # CORRECCIÓN: Definir filename_base antes de intentar generar el PDF,
+    # para que esté disponible para el JSON si el PDF falla.
+    numero_limpio = "".join(c for c in budget_data["detalles"]["numero"] if c.isalnum() or c in ('-', '_')).rstrip()
+    cliente_limpio = "".join(c for c in budget_data["cliente"]["nombre"] if c.isalnum() or c in ('-', '_')).rstrip()
+    filename_base = f"Presupuesto_{numero_limpio}_{cliente_limpio}"
+
     # Generar PDF
     pdf_output = generate_pdf_bytes(budget_data)
     if pdf_output:
-        numero_limpio = "".join(c for c in budget_data["detalles"]["numero"] if c.isalnum() or c in ('-', '_')).rstrip()
-        cliente_limpio = "".join(c for c in budget_data["cliente"]["nombre"] if c.isalnum() or c in ('-', '_')).rstrip()
-        filename_base = f"Presupuesto_{numero_limpio}_{cliente_limpio}"
-
         st.download_button(
             label="Descargar PDF",
             data=pdf_output,
