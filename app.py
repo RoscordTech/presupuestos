@@ -39,33 +39,33 @@ def generate_pdf_bytes(data):
         pdf = FPDF()
         pdf.add_page()
         
-        # --- CORRECCIÓN: Cargar todas las variantes (normal, negrita, cursiva) de la fuente Unicode ---
-        # Asegúrate de que los archivos .ttf estén en la misma carpeta que 'app.py'
-        # Los nombres de archivo aquí DEBEN coincidir exactamente con los archivos que descargues.
+        # --- Cargar todas las variantes (normal, negrita) de la fuente Unicode ---
+        # ¡IMPORTANTE! Asegúrate de que estos nombres de archivo .ttf coincidan EXACTAMENTE
+        # con los archivos que tienes en la misma carpeta que 'app.py'.
         font_name = "DejaVuSans" # Este es el nombre que usaremos para referenciar la fuente en set_font()
         font_path_normal = "DejaVuSansCondensed.ttf"
         font_path_bold = "DejaVuSansCondensed-Bold.ttf"
-        font_path_italic = "DejaVuSansCondensed-Oblique.ttf" # O "DejaVuSansCondensed-Italic.ttf"
+        # font_path_italic = "DejaVuSansCondensed-Oblique.ttf" # <--- YA NO SE NECESITA NI SE CARGA
 
         try:
             # Carga la versión normal de la fuente
             pdf.add_font(font_name, "", font_path_normal, uni=True)
             # Carga la versión negrita de la fuente (estilo "B")
             pdf.add_font(font_name, "B", font_path_bold, uni=True) 
-            # Carga la versión cursiva de la fuente (estilo "I")
-            pdf.add_font(font_name, "I", font_path_italic, uni=True) 
-            # Carga la versión negrita y cursiva (estilo "BI")
-            # Esto es opcional, si tienes un archivo para BI, o si FPDF lo combina automáticamente.
-            # pdf.add_font(font_name, "BI", "DejaVuSansCondensed-BoldOblique.ttf", uni=True)
+            # YA NO SE CARGA LA VERSIÓN CURSIVA (ESTILO "I")
+            # Nota: FPDF puede combinar "B" e "I" para "BI" si no se proporciona un archivo específico,
+            # pero no usaremos "I" en ninguna parte ahora.
 
         except Exception as e:
+            # Si hay un error al cargar alguna de las fuentes personalizadas,
+            # usará la fuente predefinida "helvetica" como alternativa.
             st.error(f"Error al cargar una o más variantes de la fuente {font_name}. Asegúrate de que los archivos TTF estén en la carpeta raíz y los nombres de archivo sean correctos. Usando Helvetica como fallback. Error: {e}")
-            pdf.set_font("helvetica", size=10) # Fallback si la fuente personalizada falla
-            st.warning("Se ha usado Helvetica. Puede que algunos caracteres no se muestren correctamente.")
+            pdf.set_font("helvetica", size=10) # Fallback
+            st.warning("Se ha usado Helvetica. Puede que algunos caracteres (como '€') no se muestren correctamente.")
             # Si el fallback a Helvetica ocurre, el resto de las llamadas a set_font() deben usar "helvetica"
 
         # --- AHORA USAREMOS ESTA FUENTE (DejaVuSans) EN TODAS PARTES ---
-        # Asegúrate de usar el 'font_name' que definimos.
+        # Asegúrate de usar el 'font_name' que definimos ("DejaVuSans").
         pdf.set_font(font_name, size=10) 
 
         # Configuración de márgenes y posiciones
@@ -194,7 +194,8 @@ def generate_pdf_bytes(data):
         pdf.multi_cell(pdf.w - 2 * margin, 4, data['notas']) 
 
         # --- Pie de página ---
-        pdf.set_font(font_name, "I", 8) # Usando DejaVuSans en cursiva
+        # CORRECCIÓN: Usando la fuente normal ("") en lugar de cursiva ("I")
+        pdf.set_font(font_name, "", 8) # Usando DejaVuSans normal, tamaño 8
         pdf.set_xy(margin, pdf.h - 15) 
         pdf.cell(0, 10, "Gracias por su confianza.", 0, 0, 'C')
 
