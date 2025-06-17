@@ -4,44 +4,35 @@ import json # Para manejar datos en formato JSON
 from datetime import datetime # Para obtener la fecha actual
 from fpdf import FPDF # <-- Nueva librería para generar PDFs
 
-# --- Inicialización de variables de estado para la descarga ---
-# Estas variables se reinician en cada re-ejecución completa del script,
-# asegurando que los botones de descarga no intenten renderizarse con datos antiguos o nulos.
-if 'pdf_download_data' not in st.session_state:
-    st.session_state.pdf_download_data = None
-if 'json_download_data' not in st.session_state:
-    st.session_state.json_download_data = None
-if 'download_filename' not in st.session_state:
-    st.session_state.download_filename = "" # Para almacenar el nombre base del archivo
-
-# --- Función para inicializar el estado de la sesión de Streamlit ---
-def initialize_session_state():
-    if 'empresa' not in st.session_state:
-        st.session_state.empresa = {
-            "nombre": "SERVICIO TECNICO ERB",
-            "nif": "60379728J",
-            "direccion": "CL RAMBLA BRASIL, 7 D EN 4\n08028 - BARCELONA", 
-            "telefono": "",
-            "email": "",
-            "logo_file": "logo.png" # <--- ¡IMPORTANTE! Asegúrate que este sea el nombre EXACTO de tu archivo de logo (ej. logo.jpg)
-        }
-    if 'cliente' not in st.session_state:
-        st.session_state.cliente = {
-            "nombre": "",
-            "dni": "",
-            "direccion": ""
-        }
-    if 'detalles' not in st.session_state:
-        st.session_state.detalles = {
-            "numero": "",
-            "fecha": datetime.now().strftime("%d/%m/%Y")
-        }
-    if 'conceptos' not in st.session_state:
-        st.session_state.conceptos = [{"descripcion": "", "cantidad": "", "precio": ""}]
-    if 'notas' not in st.session_state:
-        st.session_state.notas = ""
-    if 'aplicar_iva' not in st.session_state:
-        st.session_state.aplicar_iva = True
+# --- Inicialización de variables de estado de la sesión ---
+# Mantendremos estas inicializaciones para la gestión general del formulario,
+# pero los datos de descarga directos no se mantendrán entre ejecuciones principales.
+if 'empresa' not in st.session_state:
+    st.session_state.empresa = {
+        "nombre": "SERVICIO TECNICO ERB",
+        "nif": "60379728J",
+        "direccion": "CL RAMBLA BRASIL, 7 D EN 4\n08028 - BARCELONA", 
+        "telefono": "",
+        "email": "",
+        "logo_file": "logo.png" # <--- ¡IMPORTANTE! Asegúrate que este sea el nombre EXACTO de tu archivo de logo (ej. logo.jpg)
+    }
+if 'cliente' not in st.session_state:
+    st.session_state.cliente = {
+        "nombre": "",
+        "dni": "",
+        "direccion": ""
+    }
+if 'detalles' not in st.session_state:
+    st.session_state.detalles = {
+        "numero": "",
+        "fecha": datetime.now().strftime("%d/%m/%Y")
+    }
+if 'conceptos' not in st.session_state:
+    st.session_state.conceptos = [{"descripcion": "", "cantidad": "", "precio": ""}]
+if 'notas' not in st.session_state:
+    st.session_state.notas = ""
+if 'aplicar_iva' not in st.session_state:
+    st.session_state.aplicar_iva = True
 
 # --- Función para generar el PDF con fpdf2 ---
 def generate_pdf_bytes(data):
@@ -211,6 +202,7 @@ st.set_page_config(
 
 st.title("Generador de Presupuestos Profesional 💸")
 
+# Llamada a la inicialización del estado (debe hacerse una vez al inicio del script)
 initialize_session_state()
 
 # --- Sección de Cargar Plantilla Editable (JSON) en la barra lateral ---
@@ -223,7 +215,12 @@ if uploaded_file is not None:
         st.session_state.empresa = data.get("empresa", st.session_state.empresa)
         st.session_state.cliente = data.get("cliente", st.session_state.cliente)
         st.session_state.detalles = data.get("detalles", st.session_state.detalles)
-        st.session_state.conceptos = data.get("conceptos", [{"descripcion": "", "cantidad": "", "precio": ""}])
+        # Asegurarse de que los conceptos se carguen correctamente y sean mutables si es necesario
+        # También que si hay concepto es lista y no otro tipo de datos
+        if isinstance(data.get("conceptos"), list):
+            st.session_state.conceptos = data.get("conceptos")
+        else:
+            st.session_state.conceptos = [{"descripcion": "", "cantidad": "", "precio": ""}] # Resetea si el formato no es lista
         st.session_state.notas = data.get("notas", "")
         st.session_state.aplicar_iva = data.get("aplicar_iva", True)
         st.sidebar.success("Plantilla cargada con éxito!")
@@ -265,24 +262,33 @@ new_conceptos = []
 deleted_indices = set() 
 
 for i, concepto in enumerate(st.session_state.conceptos):
-    if i not in deleted_indices:
-        cols = st.columns([0.6, 0.15, 0.15, 0.1])
-        with cols[0]:
-            desc = st.text_input(f"Descripción_{i}", value=concepto["descripcion"], label_visibility="collapsed", key=f"desc_{i}")
-        with cols[1]:
-            cant_str = st.text_input(f"Cantidad_{i}", value=str(concepto["cantidad"]), label_visibility="collapsed", key=f"cant_{i}")
-            cant = float(cant_str) if cant_str.replace('.', '', 1).isdigit() else 0.0
-        with cols[2]:
-            precio_str = st.text_input(f"Precio_{i}", value=str(concepto["precio"]), label_visibility="collapsed", key=f"precio_{i}")
-            precio = float(precio_str) if precio_str.replace('.', '', 1).isdigit() else 0.0
-        with cols[3]:
-            if st.button("X", key=f"delete_btn_{i}"):
-                deleted_indices.add(i) 
+    # Condición para evitar procesar conceptos que ya han sido marcados para eliminación
+    if i in deleted_indices:
+        continue # Saltar este concepto en la lista a procesar
 
-        new_conceptos.append({"descripcion": desc, "cantidad": cant, "precio": precio})
+    cols = st.columns([0.6, 0.15, 0.15, 0.1])
+    with cols[0]:
+        desc = st.text_input(f"Descripción_{i}", value=concepto["descripcion"], label_visibility="collapsed", key=f"desc_{i}")
+    with cols[1]:
+        cant_str = st.text_input(f"Cantidad_{i}", value=str(concepto["cantidad"]), label_visibility="collapsed", key=f"cant_{i}")
+        cant = float(cant_str) if cant_str.replace('.', '', 1).isdigit() else 0.0
+    with cols[2]:
+        precio_str = st.text_input(f"Precio_{i}", value=str(concepto["precio"]), label_visibility="collapsed", key=f"precio_{i}")
+        precio = float(precio_str) if precio_str.replace('.', '', 1).isdigit() else 0.0
+    with cols[3]:
+        # El botón de borrar. st.button devuelve True si fue clickeado en esta ejecución
+        if st.button("X", key=f"delete_btn_{i}"):
+            deleted_indices.add(i) # Marcar para eliminación
+            # No necesitamos un `st.experimental_rerun()` aquí porque el ajuste de la lista
+            # y el rerun condicional se hará después de este bucle.
 
+    new_conceptos.append({"descripcion": desc, "cantidad": cant, "precio": precio})
+
+# Reconstruir la lista de conceptos después de procesar todas las filas
+# Solo incluimos los conceptos que no fueron marcados para eliminación
 st.session_state.conceptos = [c for i, c in enumerate(new_conceptos) if i not in deleted_indices]
 
+# Si se marcó algún elemento para borrar, forzar un rerun para que la UI se actualice
 if deleted_indices:
     st.experimental_rerun()
 
@@ -308,13 +314,8 @@ st.write(f"**IVA (21%):** {iva:.2f} €")
 st.write(f"**TOTAL:** {total:.2f} €")
 st.markdown("---")
 
-# --- Botón de Generar PDF y JSON ---
+# --- Botón de Generar PDF y JSON (Los botones de descarga se crean aquí directamente) ---
 if st.button("GENERAR PRESUPUESTO"):
-    # Limpiamos los datos de descarga anteriores del estado de la sesión
-    st.session_state.pdf_download_data = None
-    st.session_state.json_download_data = None
-    st.session_state.download_filename = "" # También el nombre del archivo
-
     budget_data = {
         "empresa": st.session_state.empresa,
         "cliente": st.session_state.cliente,
@@ -328,35 +329,27 @@ if st.button("GENERAR PRESUPUESTO"):
     numero_limpio = "".join(c for c in budget_data["detalles"]["numero"] if c.isalnum() or c in ('-', '_')).rstrip()
     cliente_limpio = "".join(c for c in budget_data["cliente"]["nombre"] if c.isalnum() or c in ('-', '_')).rstrip()
     filename_base = f"Presupuesto_{numero_limpio}_{cliente_limpio}"
-    st.session_state.download_filename = filename_base # Guardamos el nombre base en el estado
 
     pdf_output = generate_pdf_bytes(budget_data)
     if pdf_output:
-        st.session_state.pdf_download_data = pdf_output # Almacenamos los bytes del PDF en el estado
-        st.success("PDF generado. Haz clic en el botón 'Descargar PDF' de abajo.")
+        st.download_button(
+            label="Descargar PDF",
+            data=pdf_output,
+            file_name=f"{filename_base}.pdf",
+            mime="application/pdf",
+            key="download_pdf_button"
+        )
+        st.success("PDF generado. Haz clic en el botón 'Descargar PDF' de arriba.")
     else:
         st.error("No se pudo generar el PDF. Revisa los mensajes de error.")
 
+
     json_output = json.dumps(budget_data, ensure_ascii=False, indent=4).encode('utf-8')
-    st.session_state.json_download_data = json_output # Almacenamos los bytes del JSON en el estado
-
-
-# --- Mostrar botones de descarga solo si hay datos disponibles en el estado ---
-# Estos botones se renderizarán en la siguiente ejecución del script si se generaron datos con éxito
-if st.session_state.pdf_download_data is not None and st.session_state.download_filename != "":
-    st.download_button(
-        label="Descargar PDF",
-        data=st.session_state.pdf_download_data,
-        file_name=f"{st.session_state.download_filename}.pdf",
-        mime="application/pdf",
-        key="download_pdf_button"
-    )
-
-if st.session_state.json_download_data is not None and st.session_state.download_filename != "":
+    # El botón JSON siempre debería ser generable si la generación de datos es exitosa.
     st.download_button(
         label="Descargar Plantilla JSON",
-        data=st.session_state.json_download_data,
-        file_name=f"Plantilla_{st.session_state.download_filename}.json",
+        data=json_output,
+        file_name=f"Plantilla_{filename_base}.json",
         mime="application/json",
         key="download_json_button"
     )
